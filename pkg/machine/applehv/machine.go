@@ -583,6 +583,11 @@ func (m *MacMachine) Start(name string, opts machine.StartOptions) error {
 	if err != nil {
 		return err
 	}
+	if _, exists := os.LookupEnv("PODMAN_VFKIT_DEBUG"); exists {
+		cmd.Args = append(cmd.Args, "--log-level", "debug")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 
 	vfkitEndpointArgs, err := getVfKitEndpointCMDArgs(m.Vfkit.Endpoint)
 	if err != nil {
