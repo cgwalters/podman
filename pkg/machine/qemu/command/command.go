@@ -102,6 +102,33 @@ func (q *QemuCmd) SetDisplay(display string) {
 	*q = append(*q, "-display", display)
 }
 
+// AddSystemdCredentialRootPasswordPlaintext sets the root password.
+// See https://systemd.io/CREDENTIALS/
+func (q *QemuCmd) AddSystemdCredentialRootPasswordPlaintext(passwd string) {
+	*q = append(*q, "-smbios", "type=11,value=io.systemd.credential:passwd.plaintext-password.root="+passwd)
+}
+
+// AddSystemdCredentialConsoleAutologin enables aggetty to autologin as root.
+// See https://systemd.io/CREDENTIALS/ and https://man7.org/linux/man-pages/man8/agetty.8.html
+func (q *QemuCmd) AddSystemdCredentialConsoleAutologin() {
+	*q = append(*q, "-smbios", "type=11,value=io.systemd.credential:agetty.autologin=root")
+}
+
+// AddSystemdCredentialTmpfilesExtra injects extra files via tmpfiles.d
+// See https://systemd.io/CREDENTIALS/
+func (q *QemuCmd) AddSystemdCredentialTmpfilesExtra(content string) {
+	b64Content := base64.StdEncoding.EncodeToString([]byte(content))
+	*q = append(*q, "-smbios", "type=11,value=io.systemd.credential.binary:tmpfiles.extra="+b64Content)
+}
+
+// AddSystemdCredentialTmpfilesExtra injects the root SSH key
+// See https://systemd.io/CREDENTIALS/
+func (q *QemuCmd) AddSystemdCredentialRootSSH(key string) {
+	keyEncoded := base64.StdEncoding.EncodeToString([]byte(key))
+	tmpfiles := "f~ /root/.ssh/authorized_keys 600 root root - " + keyEncoded
+	q.AddSystemdCredentialTmpfilesExtra(tmpfiles)
+}
+
 // SetPropagatedHostEnvs adds options that propagate SSL and proxy settings
 func (q *QemuCmd) SetPropagatedHostEnvs() {
 	*q = propagateHostEnv(*q)

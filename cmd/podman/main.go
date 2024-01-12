@@ -15,6 +15,7 @@ import (
 	_ "github.com/containers/podman/v4/cmd/podman/kube"
 	_ "github.com/containers/podman/v4/cmd/podman/machine"
 	_ "github.com/containers/podman/v4/cmd/podman/machine/os"
+	_ "github.com/containers/podman/v4/cmd/podman/machine/bootc"
 	_ "github.com/containers/podman/v4/cmd/podman/manifest"
 	_ "github.com/containers/podman/v4/cmd/podman/networks"
 	_ "github.com/containers/podman/v4/cmd/podman/pods"

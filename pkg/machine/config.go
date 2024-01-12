@@ -299,6 +299,21 @@ const (
 	DockerGlobal
 )
 
+type SpawnTransientOpts struct {
+	// Cpus is the number of CPUs to allocate
+	Cpus uint32
+	// MemoryMiB is the amount of memory in MiB
+	MemoryMiB uint32
+	// Disk is path to backing disk image
+	Disk string
+
+	// Gui enables a graphical console
+	Gui bool
+
+	// Enable debug logging for VM launchign
+	VMDebug bool
+}
+
 type VirtProvider interface { //nolint:interfacebloat
 	Artifact() define.Artifact
 	CheckExclusiveActiveVM() (bool, string, error)
@@ -308,6 +323,7 @@ type VirtProvider interface { //nolint:interfacebloat
 	List(opts ListOptions) ([]*ListResponse, error)
 	LoadVMByName(name string) (VM, error)
 	NewMachine(opts InitOptions) (VM, error)
+	SpawnTransient(opts SpawnTransientOpts) error
 	NewDownload(vmName string) (Download, error)
 	RemoveAndCleanMachines() error
 	VMType() define.VMType

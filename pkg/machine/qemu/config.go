@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/containers/common/pkg/config"
@@ -62,7 +64,7 @@ func (v *MachineVM) setQMPMonitorSocket() error {
 // setNewMachineCMD configure the CLI command that will be run to create the new
 // machine
 func (v *MachineVM) setNewMachineCMD(qemuBinary string, cmdOpts *setNewMachineCMDOpts) {
-	v.CmdLine = command.NewQemuBuilder(qemuBinary, v.addArchOptions(cmdOpts))
+	v.CmdLine = command.NewQemuBuilder(qemuBinary, addArchOptions(v.Name, cmdOpts))
 	v.CmdLine.SetMemory(v.Memory)
 	v.CmdLine.SetCPUs(v.CPUs)
 	v.CmdLine.SetIgnitionFile(v.IgnitionFile)
@@ -148,6 +150,43 @@ func (p *QEMUVirtualization) NewMachine(opts machine.InitOptions) (machine.VM, e
 	cmdOpts := setNewMachineCMDOpts{imageDir: dataDir}
 	vm.setNewMachineCMD(execPath, &cmdOpts)
 	return vm, nil
+}
+
+func (p *QEMUVirtualization) SpawnTransient(opts machine.SpawnTransientOpts) error {
+	qemuBinary, err := findQEMUBinary()
+	if err != nil {
+		return err
+	}
+
+	pubkey, err := machine.GetSSHKeys(define.DefaultIdentityName)
+	if err != nil {
+		return err
+	}
+
+	var newMachineOpts setNewMachineCMDOpts
+	cmdline := command.NewQemuBuilder(qemuBinary, addArchOptions("transient", &newMachineOpts))
+	cmdline.SetMemory(uint64(opts.MemoryMiB))
+	cmdline.SetCPUs(uint64(opts.Cpus))
+	cmdline.SetBootableImage(opts.Disk)
+	cmdline.AddSystemdCredentialRootSSH(pubkey)
+
+	if !opts.Gui {
+		cmdline.SetDisplay("none")
+	}
+
+	qemuArgs := cmdline.Build()
+	cmd := exec.Command(qemuArgs[0], qemuArgs[1:]...)
+	// Lifecycle bind with this process by default; this tool is all about
+	// running ephemeral VMs.
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Pdeathsig: syscall.SIGTERM,
+	}
+
+	logrus.Debugf("Spawning qemu %v", qemuArgs)
+	if err := cmd.Run(); err != nil {
+		logrus.Infof("qemu exited with error %v", err)
+	}
+	return nil
 }
 
 // LoadVMByName reads a json file that describes a known qemu vm

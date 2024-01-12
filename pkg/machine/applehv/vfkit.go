@@ -7,14 +7,25 @@ import (
 	vfConfig "github.com/crc-org/vfkit/pkg/config"
 )
 
-func getDefaultDevices(imagePath, logPath, readyPath string) ([]vfConfig.VirtioDevice, error) {
+// getBasicDevices returns a list of basic devices that we want to have in every VM.
+func getBasicDevices() ([]vfConfig.VirtioDevice, error) {
 	var devices []vfConfig.VirtioDevice
-
-	disk, err := vfConfig.VirtioBlkNew(imagePath)
+	rng, err := vfConfig.VirtioRngNew()
 	if err != nil {
 		return nil, err
 	}
-	rng, err := vfConfig.VirtioRngNew()
+	devices = append(devices, rng)
+	return devices, nil
+}
+
+// getDefaultDevices sets up the default devices.
+func getDefaultDevices(imagePath, logPath, readyPath string) ([]vfConfig.VirtioDevice, error) {
+	devices, err := getBasicDevices()
+	if err != nil {
+		return nil, err
+	}
+
+	disk, err := vfConfig.VirtioBlkNew(imagePath)
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +39,7 @@ func getDefaultDevices(imagePath, logPath, readyPath string) ([]vfConfig.VirtioD
 	if err != nil {
 		return nil, err
 	}
-	devices = append(devices, disk, rng, serial, readyDevice)
+	devices = append(devices, disk, serial, readyDevice)
 	return devices, nil
 }
 

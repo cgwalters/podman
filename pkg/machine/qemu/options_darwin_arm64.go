@@ -12,8 +12,8 @@ var (
 	QemuCommand = "qemu-system-aarch64"
 )
 
-func (v *MachineVM) addArchOptions(cmdOpts *setNewMachineCMDOpts) []string {
-	ovmfDir := getOvmfDir(cmdOpts.imageDir, v.Name)
+func addArchOptions(name string, cmdOpts *setNewMachineCMDOpts) []string {
+	ovmfDir := getOvmfDir(cmdOpts.imageDir, name)
 	opts := []string{
 		"-accel", "hvf",
 		"-accel", "tcg",

@@ -9,7 +9,7 @@ var (
 	QemuCommand = "qemu-system-aarch64"
 )
 
-func (v *MachineVM) addArchOptions(_ *setNewMachineCMDOpts) []string {
+func addArchOptions(_ string, _ *setNewMachineCMDOpts) []string {
 	opts := []string{
 		"-accel", "kvm",
 		"-cpu", "host",

@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/containers/common/pkg/config"
 	"github.com/containers/podman/v4/pkg/machine"
 	"github.com/containers/podman/v4/pkg/machine/compression"
 	"github.com/containers/podman/v4/pkg/machine/define"
@@ -16,6 +18,7 @@ import (
 	"github.com/containers/podman/v4/pkg/machine/vmconfigs"
 	vfConfig "github.com/crc-org/vfkit/pkg/config"
 	"github.com/docker/go-units"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -155,6 +158,85 @@ func (v AppleHVVirtualization) NewMachine(opts machine.InitOptions) (machine.VM,
 		return nil, err
 	}
 	return m.loadFromFile()
+}
+
+func (v AppleHVVirtualization) SpawnTransient(opts machine.SpawnTransientOpts) error {
+	cfg, err := config.Default()
+	if err != nil {
+		return err
+	}
+	tempdir, err := os.MkdirTemp("", "podman-machine-applehv-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tempdir)
+	efidir := filepath.Join(tempdir, "efi")
+	if err := os.MkdirAll(efidir, 0755); err != nil {
+		return err
+	}
+
+	vfkitPath, err := cfg.FindHelperBinary("vfkit", false)
+	if err != nil {
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	bl := vfConfig.NewEFIBootloader(filepath.Join(efidir, "applehv-transient"), true)
+	vmconfig := vfConfig.NewVirtualMachine(uint(opts.Cpus), uint64(opts.MemoryMiB), bl)
+
+	devices, err := getBasicDevices()
+	if err != nil {
+		return err
+	}
+	diskDevice, err := vfConfig.VirtioBlkNew(opts.Disk)
+	if err != nil {
+		return err
+	}
+	devices = append(devices, diskDevice)
+
+	
+	vmconfig.Devices = append(vmconfig.Devices, devices...)
+
+	if opts.Gui {
+		debugdevs, err := getDebugDevices()
+		if err != nil {
+			return err
+		}
+		vmconfig.Devices = append(vmconfig.Devices, debugdevs...)
+	} else {
+		serial, err :=  vfConfig.VirtioSerialNewStdio()
+		if err != nil {
+			return err
+		}
+		vmconfig.Devices = append(vmconfig.Devices, serial)
+	}
+
+	cmd, err := vmconfig.Cmd(vfkitPath)
+	if err != nil {
+		return err
+	}
+	// Disable HTTP API
+	cmd.Args = append(cmd.Args, "--restful-uri=none://")
+	if opts.Gui {
+		cmd.Args = append(cmd.Args, "--gui")
+	}
+
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+
+	if opts.VMDebug {
+		cmd.Args = append(cmd.Args, "--log-level", "debug")
+	}
+
+
+	logrus.Debugf("Spawning vfkit: %v", cmd.Args)
+	if err := cmd.Run(); err != nil {
+		logrus.Infof("vfkit exited with error: %v", err)
+		
+	}
+	return nil
 }
 
 func (v AppleHVVirtualization) RemoveAndCleanMachines() error {
